@@ -1,0 +1,21 @@
+import re, os
+
+pw_regex     = re.compile(r'(?i)password\s*[:=]\s*(\S{6,})')
+wallet_regex = re.compile(r'0x[a-fA-F0-9]{40}')
+
+passwords, wallets = [], []
+
+for line in open("workdir/text/passwords.txt", encoding="utf8", errors="ignore"):
+    m = pw_regex.search(line)
+    if m:
+        passwords.append(m.group(1))
+
+for fname in os.listdir("workdir/json/"):
+    data = open(f"workdir/json/{fname}").read()
+    wallets += wallet_regex.findall(data)
+
+# Sonuçları kaydet
+with open("extracted_passwords.txt","w") as f:
+    f.write("\n".join(set(passwords)))
+with open("extracted_wallets.txt","w") as f:
+    f.write("\n".join(set(wallets)))
