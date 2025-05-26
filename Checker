@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# Ayarlar
+DIR="/opt/scripts"
+BASELINE="$DIR/baseline_hashes.txt"
+REPORT="$DIR/integrity_report.txt"
+
+# İlk çalıştırmada baseline dosyası yoksa oluşturup çık
+if [ ! -f "$BASELINE" ]; then
+  sha256sum "$DIR"/* 2>/dev/null > "$BASELINE"
+  exit 0
+fi
+
+# Geçici olarak güncel hash’leri al
+CURRENT=$(mktemp)
+sha256sum "$DIR"/* 2>/dev/null > "$CURRENT"
+
+# Raporu yaz
+{
+  printf "Integrity Report: %s\n\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+
+  # Silinen dosyalar
+  printf "Removed files:\n"
+  comm -23 <(cut -d' ' -f3- "$BASELINE" | sort) \
+           <(cut -d' ' -f3- "$CURRENT"  | sort)
+
+  # Yeni eklenen dosyalar
+  printf "\nNew files:\n"
+  comm -13 <(cut -d' ' -f3- "$BASELINE" | sort) \
+           <(cut -d' ' -f3- "$CURRENT"  | sort)
+
+  # Değişen dosyalar
+  printf "\nModified files:\n"
+  comm -12 <(cut -d' ' -f3- "$BASELINE" | sort) \
+           <(cut -d' ' -f3- "$CURRENT"  | sort) | while read -r file; do
+    old=$(grep " $file\$" "$BASELINE" | awk '{print $1}')
+    new=$(grep " $file\$" "$CURRENT"  | awk '{print $1}')
+    [ "$old" != "$new" ] && printf "%s\n" "$file"
+  done
+} > "$REPORT"
+
+# Yeni hash’leri baseline olarak kaydet
+mv "$CURRENT" "$BASELINE"
+
+exit 0
+
+
+#kurulum için Script’i /opt/scripts/check_integrity.sh olarak kaydedin ve çalıştırılabilir yapın
+chmod +x /opt/scripts/check_integrity.sh
+#Cron’a her gece 02:00’de çalıştırılması için 
+crontab -e
+0 2 * * * /opt/scripts/check_integrity.sh
+#Bundan sonra ilk seferde baseline_hashes.txt oluşacak; her sabah 02:00’de script çalışıp integrity_report.txt’te değişen/silinen/yeni dosyaları listeleyecek.
